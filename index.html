@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flashcards</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mali:wght@400;600&family=Noto+Sans+Thai:wght@400;600&display=swap">
+<style>
+:root{--bg:#e8edf5;--ink:#1b2540;--sub:#5b6785;--card:#fff;--rule:#d3e1f4;--red:#e4572e;--hi:#f6c945;--ok:#2f9e6e;--line:#c9d3e6}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 "Noto Sans Thai",system-ui,sans-serif}
+header{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:12px 16px;background:var(--ink)}
+header select{flex:1;min-width:120px;max-width:260px}
+nav{display:flex;gap:4px;margin-left:auto}
+nav button{background:none;border:0;color:#b9c4e0;padding:8px 12px;border-radius:8px;font:inherit;cursor:pointer}
+nav button.on{background:var(--hi);color:var(--ink);font-weight:600}
+main{max-width:720px;margin:0 auto;padding:16px}
+button,select,input,textarea{font:inherit;color:inherit}
+select,input,textarea{border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:#fff;width:100%}
+textarea{resize:vertical;min-height:80px}
+.btn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:8px 14px;cursor:pointer}
+.btn:hover{border-color:var(--ink)}
+.btn.pri{background:var(--ink);color:#fff;border-color:var(--ink)}
+.btn.ok{background:var(--ok);color:#fff;border-color:var(--ok)}
+.btn.no{background:var(--red);color:#fff;border-color:var(--red)}
+.btn.sm{padding:4px 10px;font-size:14px}
+:focus-visible{outline:3px solid var(--hi);outline-offset:2px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.sp{flex:1}
+.muted{color:var(--sub);font-size:14px}
+.scene{perspective:1200px;margin:14px 0;cursor:pointer}
+.flip{position:relative;height:min(62vh,400px);transition:transform .5s;transform-style:preserve-3d}
+.flip.f{transform:rotateY(180deg)}
+.face{position:absolute;inset:0;backface-visibility:hidden;border-radius:14px;padding:24px 24px 24px 56px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;overflow:auto;box-shadow:0 6px 0 var(--line);
+background:linear-gradient(90deg,transparent 40px,var(--red) 40px,var(--red) 42px,transparent 42px),repeating-linear-gradient(#fff 0 31px,var(--rule) 31px 32px);background-color:var(--card)}
+.face.back{transform:rotateY(180deg)}
+.txt{font:600 clamp(22px,5vw,32px)/1.4 "Mali","Noto Sans Thai",sans-serif;white-space:pre-wrap;background:rgba(255,255,255,.85);padding:0 6px}
+.face img,.thumb{max-width:100%;max-height:50%;object-fit:contain;border-radius:8px}
+.hint{position:absolute;bottom:8px;right:14px;font-size:12px;color:var(--sub);background:#fff}
+.bar{height:6px;background:var(--line);border-radius:3px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--ok);transition:width .3s}
+.item{display:flex;gap:10px;align-items:center;background:#fff;border-radius:10px;padding:8px 10px;margin:8px 0;border:1px solid var(--line)}
+.item .thumb{width:48px;height:48px;object-fit:cover;flex:none}
+.item .t{flex:1;min-width:0}.item .t b,.item .t span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.panel{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:14px}
+.panel h3{margin:0 0 8px}
+label{display:block;font-size:14px;color:var(--sub);margin:10px 0 4px}
+dialog{border:0;border-radius:14px;padding:18px;width:min(520px,94vw);max-height:92vh;color:var(--ink)}
+dialog::backdrop{background:rgba(27,37,64,.55)}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px}
+.grid img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px;cursor:pointer;border:3px solid transparent}
+.grid img:hover{border-color:var(--hi)}
+.empty{text-align:center;padding:40px 10px;color:var(--sub)}
+#toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:8px 16px;border-radius:20px;opacity:0;transition:.3s;pointer-events:none}
+#toast.on{opacity:1}
+@media(prefers-reduced-motion:reduce){.flip{transition:none}}
+</style>
+</head>
+<body>
+<header>
+  <select id="deckSel" aria-label="ชุดการ์ด"></select>
+  <button class="btn sm" id="newDeck">+ ชุดใหม่</button>
+  <nav id="tabs">
+    <button data-t="study" class="on">เรียน</button>
+    <button data-t="cards">การ์ด</button>
+    <button data-t="ai">AI</button>
+    <button data-t="more">อื่นๆ</button>
+  </nav>
+</header>
+<main>
+  <section id="study"></section>
+  <section id="cards" hidden></section>
+  <section id="ai" hidden></section>
+  <section id="more" hidden></section>
+</main>
+
+<dialog id="dlg">
+  <h3 id="dlgTitle" style="margin:0 0 4px">การ์ด</h3>
+  <label>ด้านหน้า (คำถาม / คำศัพท์)</label><textarea id="eF"></textarea>
+  <label>ด้านหลัง (คำตอบ)</label><textarea id="eB"></textarea>
+  <label>รูปภาพ (วางลิงก์ / อัปโหลด / ค้นหา)</label>
+  <input id="eI" placeholder="https://...">
+  <div class="row" style="margin-top:8px">
+    <button class="btn sm" id="eUp">อัปโหลดรูป</button>
+    <button class="btn sm" id="eSearch">ค้นหารูปจากเว็บ</button>
+    <button class="btn sm" id="eClr">ลบรูป</button>
+    <input type="file" id="eFile" accept="image/*" hidden>
+  </div>
+  <div class="grid" id="eGrid"></div>
+  <img id="ePrev" class="thumb" style="margin-top:8px;max-height:120px" hidden>
+  <div class="row" style="margin-top:14px"><span class="sp"></span>
+    <button class="btn" id="eCancel">ยกเลิก</button><button class="btn pri" id="eSave">บันทึก</button></div>
+</dialog>
+<div id="toast"></div>
+
+<script>
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const uid=()=>Math.random().toString(36).slice(2,9);
+const KEY="flashcards-v1";
+let S;
+try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){}
+if(!S||!S.decks||!S.decks.length){S={cur:"d1",decks:[{id:"d1",name:"ชุดแรกของฉัน",cards:[
+ {id:uid(),f:"Apple",b:"แอปเปิล",img:"",k:0},{id:uid(),f:"Thailand",b:"ประเทศไทย (เมืองหลวง: กรุงเทพฯ)",img:"",k:0}]}]};}
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){toast("พื้นที่เก็บข้อมูลเต็ม ลองใช้ลิงก์รูปแทนการอัปโหลด")}};
+const deck=()=>S.decks.find(d=>d.id===S.cur)||S.decks[0];
+function toast(m){const t=$("#toast");t.textContent=m;t.classList.add("on");clearTimeout(toast.h);toast.h=setTimeout(()=>t.classList.remove("on"),2200)}
+
+/* ---------- image search (Wikipedia, ไม่ต้องใช้ API key) ---------- */
+async function searchImgs(q,n=8){
+  const out=[];
+  for(const lang of ["en","th"]){
+    try{
+      const u=`https://${lang}.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(q)}&gsrlimit=${n}&prop=pageimages&piprop=thumbnail&pithumbsize=500&format=json&origin=*`;
+      const r=await fetch(u);const j=await r.json();
+      Object.values(j.query?.pages||{}).forEach(p=>{if(p.thumbnail&&!out.includes(p.thumbnail.source))out.push(p.thumbnail.source)});
+    }catch(e){}
+    if(out.length>=n)break;
+  }
+  return out.slice(0,n);
+}
+function shrink(file,max=500){return new Promise((res,rej)=>{
+  const r=new FileReader();r.onerror=rej;
+  r.onload=()=>{const im=new Image();im.onerror=rej;im.onload=()=>{
+    const k=Math.min(1,max/Math.max(im.width,im.height));const c=document.createElement("canvas");
+    c.width=im.width*k;c.height=im.height*k;c.getContext("2d").drawImage(im,0,0,c.width,c.height);res(c.toDataURL("image/jpeg",.8))};im.src=r.result};
+  r.readAsDataURL(file)})}
+
+/* ---------- tabs / decks ---------- */
+function renderDecks(){
+  $("#deckSel").innerHTML=S.decks.map(d=>`<option value="${d.id}" ${d.id===S.cur?"selected":""}>${esc(d.name)} (${d.cards.length})</option>`).join("");
+}
+$("#deckSel").onchange=e=>{S.cur=e.target.value;save();st.i=0;st.flip=0;st.q=null;renderAll()};
+$("#newDeck").onclick=()=>{const n=prompt("ชื่อชุดการ์ดใหม่");if(n&&n.trim()){const d={id:uid(),name:n.trim(),cards:[]};S.decks.push(d);S.cur=d.id;save();st.q=null;renderAll();show("cards")}};
+function show(t){document.querySelectorAll("main section").forEach(s=>s.hidden=s.id!==t);
+  document.querySelectorAll("#tabs button").forEach(b=>b.classList.toggle("on",b.dataset.t===t))}
+$("#tabs").onclick=e=>{if(e.target.dataset.t){show(e.target.dataset.t)}};
+function renderAll(){renderDecks();renderStudy();renderCards();renderAI();renderMore()}
+
+/* ---------- study ---------- */
+const st={i:0,flip:0,q:null,onlyUnk:false,swap:false};
+function queue(){
+  if(!st.q){st.q=deck().cards.filter(c=>!st.onlyUnk||!c.k).map(c=>c.id)}
+  return st.q.map(id=>deck().cards.find(c=>c.id===id)).filter(Boolean);
+}
+function face(txt,img){return `${img?`<img src="${esc(img)}" alt="" onerror="this.remove()">`:""}<div class="txt">${esc(txt)}</div>`}
+function renderStudy(){
+  const q=queue(),d=deck(),known=d.cards.filter(c=>c.k).length;
+  if(!d.cards.length){$("#study").innerHTML=`<div class="empty">ชุดนี้ยังไม่มีการ์ด<br><br><button class="btn pri" onclick="show('cards');openEdit()">+ เพิ่มการ์ดใบแรก</button> <button class="btn" onclick="show('ai')">ให้ AI ช่วยสร้าง</button></div>`;return}
+  if(!q.length){$("#study").innerHTML=`<div class="empty">🎉 จำได้ครบทุกใบแล้ว<br><br><button class="btn pri" id="rst">เริ่มใหม่ทั้งหมด</button></div>`;
+    $("#rst").onclick=()=>{d.cards.forEach(c=>c.k=0);st.onlyUnk=false;st.q=null;st.i=0;save();renderAll()};return}
+  if(st.i>=q.length)st.i=0;
+  const c=q[st.i],A=st.swap?c.b:c.f,B=st.swap?c.f:c.b;
+  $("#study").innerHTML=`
+   <div class="row muted"><span>ใบที่ ${st.i+1}/${q.length}</span><span class="sp"></span><span>จำได้แล้ว ${known}/${d.cards.length}</span></div>
+   <div class="bar" style="margin-top:6px"><i style="width:${d.cards.length?known/d.cards.length*100:0}%"></i></div>
+   <div class="scene" id="scene" tabindex="0" aria-label="พลิกการ์ด"><div class="flip ${st.flip?"f":""}">
+     <div class="face">${face(A,c.img)}<span class="hint">แตะเพื่อพลิก</span></div>
+     <div class="face back">${face(B,st.swap?"":c.img)}</div></div></div>
+   <div class="row"><button class="btn" id="pv">◀ ก่อนหน้า</button><button class="btn no" id="kn0">ยังไม่จำ</button><button class="btn ok" id="kn1">จำได้</button><button class="btn" id="nx">ถัดไป ▶</button></div>
+   <div class="row" style="margin-top:12px">
+     <button class="btn sm" id="shuf">🔀 สลับลำดับ</button>
+     <button class="btn sm" id="swp">⇄ ${st.swap?"แสดงคำตอบก่อน":"แสดงคำถามก่อน"}</button>
+     <label style="margin:0;display:flex;gap:6px;align-items:center"><input type="checkbox" id="unk" style="width:auto" ${st.onlyUnk?"checked":""}>เฉพาะที่ยังไม่จำ</label></div>`;
+  $("#scene").onclick=()=>{st.flip=st.flip?0:1;document.querySelector(".flip").classList.toggle("f")};
+  const go=n=>{st.i=(st.i+n+q.length)%q.length;st.flip=0;renderStudy()};
+  $("#pv").onclick=()=>go(-1);$("#nx").onclick=()=>go(1);
+  const mark=v=>{c.k=v;save();if(v&&st.onlyUnk){st.q=null}else go(1);renderStudy()};
+  $("#kn1").onclick=()=>mark(1);$("#kn0").onclick=()=>mark(0);
+  $("#shuf").onclick=()=>{const a=q.map(c=>c.id);for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}st.q=a;st.i=0;st.flip=0;renderStudy()};
+  $("#swp").onclick=()=>{st.swap=!st.swap;st.flip=0;renderStudy()};
+  $("#unk").onchange=e=>{st.onlyUnk=e.target.checked;st.q=null;st.i=0;st.flip=0;renderStudy()};
+}
+document.addEventListener("keydown",e=>{
+  if($("#study").hidden||$("#dlg").open||/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;
+  if(e.key===" "){e.preventDefault();$("#scene")?.click()}
+  if(e.key==="ArrowRight")$("#nx")?.click();if(e.key==="ArrowLeft")$("#pv")?.click();
+});
+
+/* ---------- cards list / edit ---------- */
+let editId=null;
+function renderCards(){
+  const d=deck();
+  $("#cards").innerHTML=`<div class="row"><input id="qs" placeholder="ค้นหาการ์ด..." style="flex:1"><button class="btn pri" id="add">+ เพิ่มการ์ด</button></div>
+   <div class="row muted" style="margin:8px 0"><span>${d.cards.length} ใบ</span><span class="sp"></span>
+    <button class="btn sm" id="ren">เปลี่ยนชื่อชุด</button><button class="btn sm" id="delDeck">ลบชุดนี้</button></div><div id="list"></div>`;
+  $("#add").onclick=()=>openEdit();
+  $("#qs").oninput=drawList;
+  $("#ren").onclick=()=>{const n=prompt("ชื่อชุดใหม่",d.name);if(n&&n.trim()){d.name=n.trim();save();renderDecks()}};
+  $("#delDeck").onclick=()=>{if(S.decks.length<2)return toast("ต้องมีอย่างน้อย 1 ชุด");
+    if(confirm(`ลบชุด "${d.name}" และการ์ดทั้งหมด?`)){S.decks=S.decks.filter(x=>x!==d);S.cur=S.decks[0].id;save();st.q=null;renderAll()}};
+  drawList();
+}
+function drawList(){
+  const q=($("#qs")?.value||"").toLowerCase(),L=deck().cards.filter(c=>(c.f+" "+c.b).toLowerCase().includes(q));
+  $("#list").innerHTML=L.length?L.map(c=>`<div class="item" data-id="${c.id}">
+    ${c.img?`<img class="thumb" src="${esc(c.img)}" alt="" onerror="this.style.visibility='hidden'">`:""}
+    <div class="t"><b>${esc(c.f)}</b><span class="muted">${esc(c.b)}</span></div>
+    <button class="btn sm" data-a="e">แก้ไข</button><button class="btn sm" data-a="d">ลบ</button></div>`).join(""):`<div class="empty">ไม่พบการ์ด</div>`;
+}
+$("#cards").onclick=e=>{const b=e.target.closest("[data-a]");if(!b)return;const id=b.closest(".item").dataset.id;
+  if(b.dataset.a==="e")openEdit(id);
+  else if(confirm("ลบการ์ดใบนี้?")){deck().cards=deck().cards.filter(c=>c.id!==id);st.q=null;save();renderAll();toast("ลบแล้ว")}};
+function prev(){const v=$("#eI").value.trim(),p=$("#ePrev");p.hidden=!v;if(v)p.src=v}
+function openEdit(id){
+  editId=id||null;const c=id?deck().cards.find(x=>x.id===id):{f:"",b:"",img:""};
+  $("#dlgTitle").textContent=id?"แก้ไขการ์ด":"เพิ่มการ์ด";
+  $("#eF").value=c.f;$("#eB").value=c.b;$("#eI").value=c.img||"";$("#eGrid").innerHTML="";prev();
+  $("#dlg").showModal();$("#eF").focus();
+}
+$("#eI").oninput=prev;
+$("#eCancel").onclick=()=>$("#dlg").close();
+$("#eClr").onclick=()=>{$("#eI").value="";prev()};
+$("#eUp").onclick=()=>$("#eFile").click();
+$("#eFile").onchange=async e=>{const f=e.target.files[0];if(!f)return;try{$("#eI").value=await shrink(f);prev()}catch(x){toast("อัปโหลดไม่สำเร็จ")}e.target.value=""};
+$("#eSearch").onclick=async()=>{
+  const q=prompt("คำค้นหารูป (ภาษาอังกฤษได้ผลดีที่สุด)",$("#eF").value.trim().slice(0,40));if(!q)return;
+  $("#eGrid").innerHTML=`<span class="muted">กำลังค้นหา...</span>`;
+  const r=await searchImgs(q);
+  $("#eGrid").innerHTML=r.length?r.map(u=>`<img src="${esc(u)}" alt="">`).join(""):`<span class="muted" style="grid-column:1/-1">ไม่พบรูป ลองเปลี่ยนคำค้นหา</span>`;
+};
+$("#eGrid").onclick=e=>{if(e.target.tagName==="IMG"){$("#eI").value=e.target.src;prev();$("#eGrid").innerHTML=""}};
+$("#eSave").onclick=()=>{
+  const f=$("#eF").value.trim(),b=$("#eB").value.trim(),img=$("#eI").value.trim();
+  if(!f||!b)return toast("กรอกด้านหน้าและด้านหลังก่อน");
+  if(editId){Object.assign(deck().cards.find(c=>c.id===editId),{f,b,img})}else deck().cards.push({id:uid(),f,b,img,k:0});
+  st.q=null;save();$("#dlg").close();renderAll();toast("บันทึกแล้ว");
+};
+
+/* ---------- AI prompt + import ---------- */
+function renderAI(){
+  $("#ai").innerHTML=`
+  <div class="panel"><h3>1. สร้าง prompt ไปให้ AI</h3>
+   <label>หัวข้อ</label><input id="aT" placeholder="เช่น ศัพท์ภาษาอังกฤษเกี่ยวกับอาหาร / เมืองหลวงในยุโรป">
+   <div class="row"><div style="flex:1"><label>จำนวนการ์ด</label><input id="aN" type="number" value="20" min="1" max="100"></div>
+   <div style="flex:2"><label>รูปแบบ</label><select id="aM"><option value="ศัพท์ภาษาอังกฤษ ด้านหน้า = คำอังกฤษ ด้านหลัง = คำแปลไทยพร้อมประโยคตัวอย่าง">ศัพท์ EN → ไทย</option><option value="คำถามและคำตอบ ด้านหน้า = คำถาม ด้านหลัง = คำตอบสั้นกระชับ">คำถาม / คำตอบ</option><option value="">กำหนดเอง (ไม่ระบุ)</option></select></div></div>
+   <label>ระดับ / ข้อกำหนดเพิ่มเติม (ไม่บังคับ)</label><input id="aX" placeholder="เช่น ระดับเริ่มต้น, ใช้ภาษาไทยทั้งหมด">
+   <div class="row" style="margin-top:10px"><button class="btn pri" id="aGen">สร้าง prompt</button><button class="btn" id="aCopy">คัดลอก</button></div>
+   <textarea id="aP" style="margin-top:8px;min-height:130px" readonly placeholder="prompt จะแสดงที่นี่ แล้วนำไปวางใน ChatGPT / Claude / Gemini"></textarea></div>
+  <div class="panel"><h3>2. วางคำตอบจาก AI</h3>
+   <textarea id="aJ" style="min-height:130px" placeholder='วาง JSON ที่ได้จาก AI ที่นี่'></textarea>
+   <label style="display:flex;gap:6px;align-items:center;color:var(--ink)"><input type="checkbox" id="aImg" style="width:auto" checked>หารูปจากเว็บให้อัตโนมัติ (ใช้คำค้นหาจาก AI)</label>
+   <div class="row" style="margin-top:10px"><button class="btn pri" id="aImp">นำเข้าการ์ด</button><span class="muted" id="aSt"></span></div></div>`;
+  $("#aGen").onclick=()=>{
+    const t=$("#aT").value.trim();if(!t)return toast("ใส่หัวข้อก่อน");
+    $("#aP").value=`ช่วยสร้างแฟลชการ์ดหัวข้อ "${t}" จำนวน ${$("#aN").value||20} ใบ
+${$("#aM").value?"รูปแบบ: "+$("#aM").value:""}
+${$("#aX").value.trim()?"ข้อกำหนดเพิ่มเติม: "+$("#aX").value.trim():""}
+
+ตอบเป็น JSON array เท่านั้น ห้ามมีข้อความอื่นนอกจาก JSON โดยแต่ละใบมีรูปแบบนี้:
+[{"front":"ด้านหน้า","back":"ด้านหลัง","image":"คำค้นหารูปภาษาอังกฤษสั้นๆ 1-3 คำ หรือ \\"\\" ถ้าไม่เหมาะกับรูป"}]`.replace(/\n{3,}/g,"\n\n");
+  };
+  $("#aCopy").onclick=async()=>{const v=$("#aP").value;if(!v)return toast("กดสร้าง prompt ก่อน");
+    try{await navigator.clipboard.writeText(v)}catch(e){$("#aP").select();document.execCommand("copy")}toast("คัดลอกแล้ว")};
+  $("#aImp").onclick=importJSON;
+}
+async function importJSON(){
+  let raw=$("#aJ").value,a=raw.indexOf("["),b=raw.lastIndexOf("]"),arr;
+  try{arr=JSON.parse(raw.slice(a,b+1))}catch(e){return toast("อ่าน JSON ไม่ได้ ตรวจว่าวางครบทั้งก้อน")}
+  arr=arr.filter(x=>x&&(x.front||x.f)&&(x.back||x.b));if(!arr.length)return toast("ไม่พบการ์ดใน JSON");
+  const d=deck(),auto=$("#aImg").checked,btn=$("#aImp");btn.disabled=true;let n=0;
+  for(const x of arr){
+    let img=(x.image||x.img||"").trim();
+    if(img&&!/^https?:|^data:/.test(img)){img=auto?((await searchImgs(img,1))[0]||""):""}
+    d.cards.push({id:uid(),f:String(x.front||x.f),b:String(x.back||x.b),img,k:0});
+    $("#aSt").textContent=`กำลังนำเข้า ${++n}/${arr.length}`;
+  }
+  btn.disabled=false;$("#aJ").value="";st.q=null;save();renderAll();show("cards");toast(`เพิ่ม ${n} ใบแล้ว`);
+}
+
+/* ---------- more: export / import / reset ---------- */
+function renderMore(){
+  $("#more").innerHTML=`<div class="panel"><h3>สำรองข้อมูล</h3><p class="muted">ข้อมูลเก็บในเบราว์เซอร์เครื่องนี้ ควรส่งออกไฟล์สำรองไว้เป็นระยะ</p>
+   <div class="row"><button class="btn" id="exA">ส่งออกทุกชุด (.json)</button><button class="btn" id="exD">ส่งออกชุดนี้</button><button class="btn" id="imF">นำเข้าไฟล์ .json</button><input type="file" id="imI" accept=".json" hidden></div></div>
+  <div class="panel"><h3>รีเซ็ตความจำ</h3><p class="muted">ตั้งสถานะ "จำได้" ของชุดนี้กลับเป็น "ยังไม่จำ" ทั้งหมด</p><button class="btn" id="rs">รีเซ็ตชุดนี้</button></div>`;
+  const dl=(o,n)=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(o,null,1)],{type:"application/json"}));a.download=n;a.click()};
+  $("#exA").onclick=()=>dl(S,"flashcards-all.json");
+  $("#exD").onclick=()=>dl({decks:[deck()]},`flashcards-${deck().name}.json`);
+  $("#imF").onclick=()=>$("#imI").click();
+  $("#imI").onchange=async e=>{try{const j=JSON.parse(await e.target.files[0].text());
+    if(!Array.isArray(j.decks))throw 0;j.decks.forEach(d=>{d.id=uid();d.cards=(d.cards||[]).map(c=>({...c,id:uid()}));S.decks.push(d)});
+    S.cur=S.decks[S.decks.length-1].id;st.q=null;save();renderAll();toast("นำเข้าแล้ว")}catch(x){toast("ไฟล์ไม่ถูกต้อง")}e.target.value=""};
+  $("#rs").onclick=()=>{deck().cards.forEach(c=>c.k=0);st.q=null;save();renderAll();toast("รีเซ็ตแล้ว")};
+}
+renderAll();
+</script>
+</body>
+</html>
